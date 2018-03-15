@@ -1,7 +1,14 @@
 ﻿using System;
+using System.Net;
+using System.Runtime.CompilerServices;
+using GrainImplementation;
+using Microsoft.Extensions.Logging;
+using Orleans;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Host;
+using Orleans.Streams;
 using Utils;
 
 namespace OrleansServer
@@ -10,23 +17,27 @@ namespace OrleansServer
 	{
 		static void Main(string[] args)
 		{
+		    var siloPort = 11111;
+		    int gatewayPort = 30000;
+		    var siloAddress = IPAddress.Loopback;
+		    var builder = new SiloHostBuilder()
+		        .Configure<ClusterOptions>(options => options.ClusterId = "helloworldcluster")
+		        .UseDevelopmentClustering(options => options.PrimarySiloEndpoint = new IPEndPoint(siloAddress, siloPort))
+		        .ConfigureEndpoints(siloAddress, siloPort, gatewayPort)
+		        .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(TickerGrain).Assembly).WithReferences())
+		        .ConfigureLogging(logging => logging.AddConsole())
+                .AddMemoryGrainStorage("PubSubStore")
+		        .AddSimpleMessageStreamProvider(FluentConfig.AltNetStream, options=>options.PubSubType = StreamPubSubType.ImplicitOnly); ;
 
-			var siloConfig = ClusterConfiguration.LocalhostPrimarySilo();
 
-			siloConfig
-				.SimpleMessageStreamProvider(FluentConfig.AltNetStream);
-			siloConfig.Defaults.DefaultTraceLevel = Severity.Error;
-
-
-			var silo = new SiloHost("Alt.NET Demo Silo", siloConfig);
-			silo.InitializeOrleansSilo();
-			silo.StartOrleansSilo();
+		    var silo = builder.Build();
+		    silo.StartAsync().Wait();
 
 			Console.WriteLine("Press Enter to close.");
 			Console.ReadLine();
 
 			// shut the silo down after we are done.
-			silo.ShutdownOrleansSilo();
+		    silo.StopAsync().Wait();
 		}
 	}
 }

@@ -9,7 +9,7 @@ using Utils;
 namespace GrainImplementation
 {
 #pragma warning disable 618
-	public class TickerGrain : Grain, ITicker, IGrainInvokeInterceptor
+	public class TickerGrain : Grain, ITicker
 #pragma warning restore 618
 	{
 		private int counter;

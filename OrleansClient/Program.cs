@@ -1,12 +1,17 @@
 ﻿using System;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using GrainInterfaces;
 using GrainInterfaces.Model;
+using Microsoft.Extensions.Logging;
 using Orleans;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Streams;
 using Utils;
 
 namespace OrleansClient
@@ -31,17 +36,21 @@ namespace OrleansClient
 		static async Task<IClusterClient> InitializeClient(string[] args)
 		{
 			int initializeCounter = 0;
-			var config = ClientConfiguration.LocalhostSilo()
-				.SimpleMessageStreamProvider(FluentConfig.AltNetStream);
-			config.DefaultTraceLevel = Severity.Error;
 
 			var initSucceed = false;
 			while (!initSucceed)
 			{
 				try
 				{
-					var client = new ClientBuilder().UseConfiguration(config).Build();
-					await client.Connect();
+				    var siloAddress = IPAddress.Loopback;
+				    var gatewayPort = 30000;
+                    var client = new ClientBuilder().Configure<ClusterOptions>(options => options.ClusterId = "helloworldcluster")
+				        .UseStaticClustering(options => options.Gateways.Add((new IPEndPoint(siloAddress, gatewayPort)).ToGatewayUri()))
+				        .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(ITicker).Assembly).WithReferences())
+				        .ConfigureLogging(logging => logging.AddConsole())
+                        .AddSimpleMessageStreamProvider(FluentConfig.AltNetStream, options => options.PubSubType = StreamPubSubType.ImplicitOnly)
+				        .Build();
+                    await client.Connect();
 					initSucceed = client.IsInitialized;
 
 					if (initSucceed)
